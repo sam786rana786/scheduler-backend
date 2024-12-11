@@ -4,17 +4,23 @@ from fastapi.staticfiles import StaticFiles
 from .api.endpoints import auth, profile, settings, events, event_types, public
 from .db.database import engine
 from .models import user, profile as profile_model, settings as settings_model, sms, event, event_type
-from pathlib import Path
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Determine the environment and load the appropriate .env file
 env_file = ".env.prod" if os.getenv("ENV") == "production" else ".env"
-load_dotenv(Path(__file__).parent.parent / env_file)
+env_path = Path(__file__).parent.parent / env_file
+
+if env_path.exists():
+    load_dotenv(env_path)
+    print(f"Loaded environment file: {env_file}")
+else:
+    print(f"No .env file found. Using environment variables.")
 
 # Log the environment being used
-print(f"Using environment: {os.getenv('ENV', 'development')}")
-print(f"Loaded environment file: {env_file}")
+env = os.getenv('ENV', 'development')
+print(f"Using environment: {env}")
 
 # Create tables in correct order
 models = [user, profile_model, settings_model, sms, event, event_type]
@@ -24,18 +30,28 @@ for model in models:
 app = FastAPI()
 
 # Configure CORS
+if env == "production":
+    allowed_origins = [
+        "https://popsita.com",
+        "https://appointments.txhut.ca"
+    ]
+else:
+    allowed_origins = [
+        "http://localhost:3000"
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL")],  # Frontend development server
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
 
+# Mount static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Mount routes
+# Include routers
 app.include_router(public.router, tags=["public"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
