@@ -49,6 +49,11 @@ app.add_middleware(
 )
 
 # Mount static files
+uploads_dir = "uploads"
+if not os.path.exists(uploads_dir):
+    os.makedirs(uploads_dir)
+    print(f"Created directory: {uploads_dir}")
+    
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include routers
