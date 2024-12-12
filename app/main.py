@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from .api.endpoints import auth, profile, settings, events, event_types, public
 from .db.database import engine
 from .models import user, profile as profile_model, settings as settings_model, sms, event, event_type
+import os
 
 # Create tables in correct order
 models = [user, profile_model, settings_model, sms, event, event_type]
