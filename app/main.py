@@ -4,23 +4,6 @@ from fastapi.staticfiles import StaticFiles
 from .api.endpoints import auth, profile, settings, events, event_types, public
 from .db.database import engine
 from .models import user, profile as profile_model, settings as settings_model, sms, event, event_type
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-# Determine the environment and load the appropriate .env file
-env_file = ".env.prod" if os.getenv("ENV") == "production" else ".env"
-env_path = Path(__file__).parent.parent / env_file
-
-if env_path.exists():
-    load_dotenv(env_path)
-    print(f"Loaded environment file: {env_file}")
-else:
-    print(f"No .env file found. Using environment variables.")
-
-# Log the environment being used
-env = os.getenv('ENV', 'development')
-print(f"Using environment: {env}")
 
 # Create tables in correct order
 models = [user, profile_model, settings_model, sms, event, event_type]
@@ -30,15 +13,8 @@ for model in models:
 app = FastAPI()
 
 # Configure CORS
-if env == "production":
-    allowed_origins = [
-        "https://popsita.com",
-        "https://appointments.txhut.ca"
-    ]
-else:
-    allowed_origins = [
-        "http://localhost:3000"
-    ]
+allowed_origins = ["https://popsita.com", "https://appointments.txhut.ca"]
+
 
 app.add_middleware(
     CORSMiddleware,
