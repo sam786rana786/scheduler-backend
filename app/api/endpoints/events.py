@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, timedelta, timezone, time
+from datetime import datetime, timedelta, timezone, time, date
 import pytz
 from ...schemas.timeslot import TimeSlot
 from ...db.database import get_db
@@ -10,6 +10,7 @@ from ...models.user import User
 from ...models.profile import Profile
 from ...models.settings import Settings
 from ...models.event import Event as EventModel
+from ...models.token import Token as TokenModel
 from ...schemas.event import EventList, Event, EventCreate
 from ...models.event_type import EventType as EventTypeModel  # Add this import
 from ...schemas.event_type import EventType as EventTypeSchema  # If needed for response
@@ -283,7 +284,7 @@ async def get_available_timeslots(
             detail=f"Error generating time slots: {str(e)}"
         )
 
-@router.get("/events/laravel", response_model=List[EventSchema])
+@router.get("/events/laravel", response_model=List[Event])
 async def get_events(token: str, status: str = None, q: str = None, page: int = 1, db: Session = Depends(get_db)):
     token_obj = db.query(TokenModel).filter(TokenModel.token == token).first()
     if not token_obj:
