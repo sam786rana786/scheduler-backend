@@ -8,6 +8,7 @@ from ...core.auth import verify_password, create_access_token, get_password_hash
 from ...schemas.auth import User, UserCreate, Token, UserMe
 from ...models.user import User as UserModel
 from ...schemas.token import Token as TokenSchema
+from ...models.token import Token as TokenModel
 import secrets
 
 router = APIRouter()
@@ -107,12 +108,12 @@ async def get_current_user_info(
         
 @router.post("/generate-token", response_model=TokenSchema)
 async def generate_token(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     token_str = secrets.token_hex(32)
-    token = TokenSchema(user_id=user_id, token=token_str)
+    token = TokenModel(user_id=user_id, token=token_str)
     db.add(token)
     db.commit()
     db.refresh(token)
