@@ -7,7 +7,7 @@ from ...db.database import get_db
 from ...core.auth import verify_password, create_access_token, get_password_hash, get_current_user
 from ...schemas.auth import User, UserCreate, Token, UserMe
 from ...models.user import User as UserModel
-from .schemas import Token as TokenSchema
+from ...schemas.token import Token as TokenSchema
 import secrets
 
 router = APIRouter()
