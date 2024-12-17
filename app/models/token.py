@@ -10,4 +10,3 @@ class Token(Base):
     token = Column(String(255), unique=True, index=True)
 
     user = relationship("User", back_populates="tokens")
-    
