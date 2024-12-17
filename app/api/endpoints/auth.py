@@ -112,7 +112,7 @@ async def generate_token(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
 
     token_str = secrets.token_hex(32)
-    token = Token(user_id=user_id, token=token_str)
+    token = TokenSchema(user_id=user_id, token=token_str)
     db.add(token)
     db.commit()
     db.refresh(token)
