@@ -3,7 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .api.endpoints import auth, profile, settings, events, event_types, public
 from .db.database import engine
-from .models import user, profile as profile_model, settings as settings_model, sms, event, event_type, token
+from .models import (
+    user, profile as profile_model, 
+    settings as settings_model, 
+    sms, event, event_type, token
+    )
 import os
 
 # Create tables in correct order
@@ -14,7 +18,11 @@ for model in models:
 app = FastAPI()
 
 # Configure CORS
-allowed_origins = ["https://popsita.com", "https://appointments.taxhut.ca", "https://taxhut.ca"]
+allowed_origins = [
+        "https://popsita.com", 
+        "https://appointments.taxhut.ca", 
+        "https://taxhut.ca"
+    ]
 
 
 app.add_middleware(
