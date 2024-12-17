@@ -49,3 +49,6 @@ class EventList(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class EventUpdate(EventBase):
+    pass

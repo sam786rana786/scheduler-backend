@@ -102,3 +102,16 @@ async def get_current_user_info(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching user data: {str(e)}"
         )
+        
+@router.post("/generate-token", response_model=TokenSchema)
+async def generate_token(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    token_str = secrets.token_hex(32)
+    token = Token(user_id=user_id, token=token_str)
+    db.add(token)
+    db.commit()
+    db.refresh(token)
+    return token

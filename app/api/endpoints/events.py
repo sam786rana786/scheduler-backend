@@ -282,3 +282,47 @@ async def get_available_timeslots(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating time slots: {str(e)}"
         )
+
+@router.get("/events/laravel", response_model=List[EventSchema])
+async def get_events(token: str, status: str = None, q: str = None, page: int = 1, db: Session = Depends(get_db)):
+    token_obj = db.query(TokenModel).filter(TokenModel.token == token).first()
+    if not token_obj:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    query = db.query(EventModel)
+    
+    # Add status filter
+    if status:
+        today_start = datetime.combine(date.today(), time.min)
+        today_end = datetime.combine(date.today(), time.max)
+        if status == "today":
+            query = query.filter(
+                EventModel.start_time >= today_start,
+                EventModel.start_time <= today_end
+            )
+        elif status == "upcoming":
+            query = query.filter(EventModel.start_time > today_end)
+        elif status == "past":
+            query = query.filter(EventModel.start_time < today_start)
+    
+    # Add search filter
+    if q:
+        query = query.filter(
+            or_(
+                EventModel.title.ilike(f"%{q}%"),
+                EventModel.description.ilike(f"%{q}%")
+            )
+        )
+    
+    # Calculate pagination
+    items_per_page = 10
+    total = query.count()
+    total_pages = (total + items_per_page - 1) // items_per_page
+    
+    # Add sorting and pagination
+    query = query.order_by(EventModel.start_time.desc())
+    query = query.offset((page - 1) * items_per_page).limit(items_per_page)
+    
+    events = query.all()
+    
+    return events

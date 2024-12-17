@@ -16,3 +16,4 @@ class User(Base):
     sms_subscription = relationship("SMSSubscription", back_populates="user", uselist=False)
     events = relationship("Event", back_populates="user", cascade="all, delete-orphan")
     event_types = relationship("EventType", back_populates="user", cascade="all, delete-orphan")
+    tokens = relationship("Token", back_populates="user")
