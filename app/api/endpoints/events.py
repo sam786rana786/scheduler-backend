@@ -313,11 +313,17 @@ async def get_events_external(
                 detail="Invalid token"
             )
             
-        print(f"Token found, user_id: {token_record.user_id}")
+        user_profile = db.query(Profile).filter(Profile.user_id == token_record.user_id).first()
+        user_timezone = pytz.timezone(user_profile.time_zone if user_profile and user_profile.time_zone else "UTC")
+        utc = pytz.UTC
         
-        now = datetime.now()
-        today_start = datetime.combine(now.date(), time.min)
-        today_end = datetime.combine(now.date(), time.max)
+        now = datetime.now(user_timezone)
+        today_start = datetime.combine(now.date(), datetime.min.time()).replace(tzinfo=user_timezone)
+        today_end = datetime.combine(now.date(), datetime.max.time()).replace(tzinfo=user_timezone)
+        
+        # Convert to UTC for database query
+        today_start_utc = today_start.astimezone(utc)
+        today_end_utc = today_end.astimezone(utc)
         
         query = db.query(EventModel).filter(EventModel.user_id == token_record.user_id)
         
@@ -325,13 +331,13 @@ async def get_events_external(
         if status:
             if status == "today":
                 query = query.filter(
-                    EventModel.start_time >= today_start,
-                    EventModel.start_time <= today_end
+                    EventModel.start_time >= today_start_utc,
+                    EventModel.start_time <= today_end_utc
                 )
             elif status == "upcoming":
-                query = query.filter(EventModel.start_time > today_end)
+                query = query.filter(EventModel.start_time > today_end_utc)
             elif status == "past":
-                query = query.filter(EventModel.start_time < today_start)
+                query = query.filter(EventModel.start_time < today_start_utc)
         
         # Add search filter
         if q:
@@ -352,7 +358,11 @@ async def get_events_external(
         query = query.offset((page - 1) * items_per_page).limit(items_per_page)
         
         events = query.all()
-        print(f"Found {len(events)} events")
+        for event in events:
+            if event.start_time:
+                event.start_time = event.start_time.replace(tzinfo=utc).astimezone(user_timezone)
+            if event.end_time:
+                event.end_time = event.end_time.replace(tzinfo=utc).astimezone(user_timezone)
         
         return EventList(
             items=events,
