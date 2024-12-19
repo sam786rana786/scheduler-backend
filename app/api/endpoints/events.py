@@ -18,8 +18,12 @@ from ...utils.notifications import send_notifications, send_cancellation_email
 from sqlalchemy import or_
 
 router = APIRouter()
-# Create a separate router for external endpoints that don't require OAuth
-external_router = APIRouter()
+
+external_router = APIRouter(
+    prefix="/events",
+    tags=["external"],
+    dependencies=[]  # Explicitly empty dependencies
+)
 
 @router.get("/events", response_model=EventList)
 async def get_scheduled_events(
@@ -295,57 +299,74 @@ async def get_events_external(
     db: Session = Depends(get_db)
 ):
     """Get events using permanent token authentication"""
-    print(token)
-    token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
-    if not token_record:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
-    
-    now = datetime.now()
-    today_start = datetime.combine(now.date(), time.min)
-    today_end = datetime.combine(now.date(), time.max)
-    
-    query = db.query(EventModel).filter(EventModel.user_id == token_record.user_id)
-    
-    # Add status filter
-    if status:
-        if status == "today":
+    try:
+        # Debug print
+        print(f"Attempting to validate token: {token}")
+        
+        # Query token
+        token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
+        
+        if not token_record:
+            print(f"Token not found in database: {token}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+            
+        print(f"Token found, user_id: {token_record.user_id}")
+        
+        now = datetime.now()
+        today_start = datetime.combine(now.date(), time.min)
+        today_end = datetime.combine(now.date(), time.max)
+        
+        query = db.query(EventModel).filter(EventModel.user_id == token_record.user_id)
+        
+        # Add status filter
+        if status:
+            if status == "today":
+                query = query.filter(
+                    EventModel.start_time >= today_start,
+                    EventModel.start_time <= today_end
+                )
+            elif status == "upcoming":
+                query = query.filter(EventModel.start_time > today_end)
+            elif status == "past":
+                query = query.filter(EventModel.start_time < today_start)
+        
+        # Add search filter
+        if q:
             query = query.filter(
-                EventModel.start_time >= today_start,
-                EventModel.start_time <= today_end
+                or_(
+                    EventModel.title.ilike(f"%{q}%"),
+                    EventModel.description.ilike(f"%{q}%")
+                )
             )
-        elif status == "upcoming":
-            query = query.filter(EventModel.start_time > today_end)
-        elif status == "past":
-            query = query.filter(EventModel.start_time < today_start)
-    
-    # Add search filter
-    if q:
-        query = query.filter(
-            or_(
-                EventModel.title.ilike(f"%{q}%"),
-                EventModel.description.ilike(f"%{q}%")
-            )
+        
+        # Calculate pagination
+        items_per_page = 10
+        total = query.count()
+        total_pages = (total + items_per_page - 1) // items_per_page
+        
+        # Add sorting and pagination
+        query = query.order_by(EventModel.start_time.desc())
+        query = query.offset((page - 1) * items_per_page).limit(items_per_page)
+        
+        events = query.all()
+        print(f"Found {len(events)} events")
+        
+        return EventList(
+            items=events,
+            total=total,
+            page=page,
+            pages=total_pages
         )
-    
-    # Calculate pagination
-    items_per_page = 10
-    total = query.count()
-    total_pages = (total + items_per_page - 1) // items_per_page
-    
-    # Add sorting and pagination
-    query = query.order_by(EventModel.start_time.desc())
-    query = query.offset((page - 1) * items_per_page).limit(items_per_page)
-    
-    events = query.all()
-    
-    return EventList(
-        items=events,
-        total=total,
-        page=page,
-        pages=total_pages
-    )
-    
-router.include_router(external_router, prefix="/events")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+        
+router.include_router(external_router)

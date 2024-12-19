@@ -41,6 +41,8 @@ if not os.path.exists(uploads_dir):
     
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+app.include_router(events.external_router, prefix="/api", tags=["external"])
+
 # Include routers
 app.include_router(public.router, tags=["public"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
