@@ -106,15 +106,70 @@ async def get_current_user_info(
             detail=f"Error fetching user data: {str(e)}"
         )
         
-@router.post("/generate-token", response_model=TokenSchema)
-async def generate_token(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(UserModel).filter(UserModel.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+@router.post("/generate-permanent-token", response_model=TokenSchema)
+async def generate_permanent_token(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Generate a permanent API token for external applications"""
+    try:
+        # Generate a secure random token
+        token_str = secrets.token_hex(32)
+        
+        # Create token record
+        token = TokenModel(
+            user_id=current_user.id,
+            token=token_str
+        )
+        
+        db.add(token)
+        db.commit()
+        db.refresh(token)
+        
+        return token
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating token: {str(e)}"
+        )
 
-    token_str = secrets.token_hex(32)
-    token = TokenModel(user_id=user_id, token=token_str)
-    db.add(token)
-    db.commit()
-    db.refresh(token)
-    return token
+@router.get("/list-tokens", response_model=list[TokenSchema])
+async def list_tokens(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """List all permanent tokens for the current user"""
+    tokens = db.query(TokenModel).filter(
+        TokenModel.user_id == current_user.id
+    ).all()
+    return tokens
+
+@router.delete("/revoke-token/{token_id}")
+async def revoke_token(
+    token_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Revoke a specific permanent token"""
+    token = db.query(TokenModel).filter(
+        TokenModel.id == token_id,
+        TokenModel.user_id == current_user.id
+    ).first()
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Token not found"
+        )
+    
+    try:
+        db.delete(token)
+        db.commit()
+        return {"message": "Token revoked successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error revoking token: {str(e)}"
+        )
