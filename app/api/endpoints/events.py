@@ -18,6 +18,8 @@ from ...utils.notifications import send_notifications, send_cancellation_email
 from sqlalchemy import or_
 
 router = APIRouter()
+# Create a separate router for external endpoints that don't require OAuth
+external_router = APIRouter()
 
 async def get_user_from_token(
     token: str,
@@ -297,7 +299,7 @@ async def get_available_timeslots(
             detail=f"Error generating time slots: {str(e)}"
         )
 
-@router.get("/events/external", response_model=EventList)
+@external_router.get("/external", response_model=EventList)
 async def get_events_external(
     token: str = Query(..., description="API Token"),
     status: Optional[str] = None,
@@ -353,3 +355,5 @@ async def get_events_external(
         page=page,
         pages=total_pages
     )
+    
+router.include_router(external_router, prefix="/events")

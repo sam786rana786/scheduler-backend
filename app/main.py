@@ -43,8 +43,8 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include routers
 app.include_router(public.router, tags=["public"])
-app.include_router(events.router, prefix="/api", tags=["events"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(events.router, prefix="/api", tags=["events"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(event_types.router, prefix="/api", tags=["event_types"])
