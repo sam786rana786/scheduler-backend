@@ -292,7 +292,7 @@ async def get_events(token: str, status: str = None, q: str = None, page: int = 
 
     query = db.query(EventModel)
     
-    # Add status filter
+    # Add status filter 
     if status:
         today_start = datetime.combine(date.today(), time.min)
         today_end = datetime.combine(date.today(), time.max)
