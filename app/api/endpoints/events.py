@@ -19,6 +19,19 @@ from sqlalchemy import or_
 
 router = APIRouter()
 
+async def get_user_from_token(
+    token: str,
+    db: Session = Depends(get_db)
+) -> int:
+    """Validate token and return user_id"""
+    token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
+    if not token_record:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+    return token_record.user_id
+
 @router.get("/events", response_model=EventList)
 async def get_scheduled_events(
     status: Optional[str] = None,
@@ -284,46 +297,67 @@ async def get_available_timeslots(
             detail=f"Error generating time slots: {str(e)}"
         )
 
-@router.get("/events/laravel", response_model=List[Event])
-async def get_events(token: str, status: str = None, q: str = None, page: int = 1, db: Session = Depends(get_db)):
-    token_obj = db.query(TokenModel).filter(TokenModel.token == token).first()
-    if not token_obj:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    query = db.query(EventModel)
-    
-    # Add status filter 
-    if status:
-        today_start = datetime.combine(date.today(), time.min)
-        today_end = datetime.combine(date.today(), time.max)
-        if status == "today":
+@router.get("/events/external", response_model=EventList)
+async def get_events_external(
+    token: str,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+    page: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Get events using permanent token authentication"""
+    try:
+        user_id = await get_user_from_token(token, db)
+        
+        # Build base query
+        query = db.query(EventModel).filter(EventModel.user_id == user_id)
+        
+        # Add status filter
+        if status:
+            today_start = datetime.combine(date.today(), time.min)
+            today_end = datetime.combine(date.today(), time.max)
+            
+            if status == "today":
+                query = query.filter(
+                    EventModel.start_time >= today_start,
+                    EventModel.start_time <= today_end
+                )
+            elif status == "upcoming":
+                query = query.filter(EventModel.start_time > today_end)
+            elif status == "past":
+                query = query.filter(EventModel.start_time < today_start)
+        
+        # Add search filter
+        if q:
             query = query.filter(
-                EventModel.start_time >= today_start,
-                EventModel.start_time <= today_end
+                or_(
+                    EventModel.title.ilike(f"%{q}%"),
+                    EventModel.description.ilike(f"%{q}%")
+                )
             )
-        elif status == "upcoming":
-            query = query.filter(EventModel.start_time > today_end)
-        elif status == "past":
-            query = query.filter(EventModel.start_time < today_start)
-    
-    # Add search filter
-    if q:
-        query = query.filter(
-            or_(
-                EventModel.title.ilike(f"%{q}%"),
-                EventModel.description.ilike(f"%{q}%")
-            )
+        
+        # Calculate pagination
+        items_per_page = 10
+        total = query.count()
+        total_pages = (total + items_per_page - 1) // items_per_page
+        
+        # Add sorting and pagination
+        query = query.order_by(EventModel.start_time.desc())
+        query = query.offset((page - 1) * items_per_page).limit(items_per_page)
+        
+        events = query.all()
+        
+        return EventList(
+            items=events,
+            total=total,
+            page=page,
+            pages=total_pages
         )
-    
-    # Calculate pagination
-    items_per_page = 10
-    total = query.count()
-    total_pages = (total + items_per_page - 1) // items_per_page
-    
-    # Add sorting and pagination
-    query = query.order_by(EventModel.start_time.desc())
-    query = query.offset((page - 1) * items_per_page).limit(items_per_page)
-    
-    events = query.all()
-    
-    return events
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
