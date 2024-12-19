@@ -295,8 +295,8 @@ async def get_events_external(
     db: Session = Depends(get_db)
 ):
     """Get events using permanent token authentication"""
+    print(token)
     token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
-    print(token_record)
     if not token_record:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
