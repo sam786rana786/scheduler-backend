@@ -299,65 +299,61 @@ async def get_available_timeslots(
 
 @router.get("/events/external", response_model=EventList)
 async def get_events_external(
-    token: str,
+    token: str = Query(..., description="API Token"),
     status: Optional[str] = None,
-    q: Optional[str] = None,
     page: int = 1,
+    q: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Get events using permanent token authentication"""
-    try:
-        user_id = await get_user_from_token(token, db)
-        
-        # Build base query
-        query = db.query(EventModel).filter(EventModel.user_id == user_id)
-        
-        # Add status filter
-        if status:
-            today_start = datetime.combine(date.today(), time.min)
-            today_end = datetime.combine(date.today(), time.max)
-            
-            if status == "today":
-                query = query.filter(
-                    EventModel.start_time >= today_start,
-                    EventModel.start_time <= today_end
-                )
-            elif status == "upcoming":
-                query = query.filter(EventModel.start_time > today_end)
-            elif status == "past":
-                query = query.filter(EventModel.start_time < today_start)
-        
-        # Add search filter
-        if q:
-            query = query.filter(
-                or_(
-                    EventModel.title.ilike(f"%{q}%"),
-                    EventModel.description.ilike(f"%{q}%")
-                )
-            )
-        
-        # Calculate pagination
-        items_per_page = 10
-        total = query.count()
-        total_pages = (total + items_per_page - 1) // items_per_page
-        
-        # Add sorting and pagination
-        query = query.order_by(EventModel.start_time.desc())
-        query = query.offset((page - 1) * items_per_page).limit(items_per_page)
-        
-        events = query.all()
-        
-        return EventList(
-            items=events,
-            total=total,
-            page=page,
-            pages=total_pages
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
+    token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
+    if not token_record:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
         )
+    
+    now = datetime.now()
+    today_start = datetime.combine(now.date(), time.min)
+    today_end = datetime.combine(now.date(), time.max)
+    
+    query = db.query(EventModel).filter(EventModel.user_id == token_record.user_id)
+    
+    # Add status filter
+    if status:
+        if status == "today":
+            query = query.filter(
+                EventModel.start_time >= today_start,
+                EventModel.start_time <= today_end
+            )
+        elif status == "upcoming":
+            query = query.filter(EventModel.start_time > today_end)
+        elif status == "past":
+            query = query.filter(EventModel.start_time < today_start)
+    
+    # Add search filter
+    if q:
+        query = query.filter(
+            or_(
+                EventModel.title.ilike(f"%{q}%"),
+                EventModel.description.ilike(f"%{q}%")
+            )
+        )
+    
+    # Calculate pagination
+    items_per_page = 10
+    total = query.count()
+    total_pages = (total + items_per_page - 1) // items_per_page
+    
+    # Add sorting and pagination
+    query = query.order_by(EventModel.start_time.desc())
+    query = query.offset((page - 1) * items_per_page).limit(items_per_page)
+    
+    events = query.all()
+    
+    return EventList(
+        items=events,
+        total=total,
+        page=page,
+        pages=total_pages
+    )
