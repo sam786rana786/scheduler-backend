@@ -21,19 +21,6 @@ router = APIRouter()
 # Create a separate router for external endpoints that don't require OAuth
 external_router = APIRouter()
 
-async def get_user_from_token(
-    token: str,
-    db: Session = Depends(get_db)
-) -> int:
-    """Validate token and return user_id"""
-    token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
-    if not token_record:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
-    return token_record.user_id
-
 @router.get("/events", response_model=EventList)
 async def get_scheduled_events(
     status: Optional[str] = None,
@@ -308,14 +295,19 @@ async def get_events_external(
     db: Session = Depends(get_db)
 ):
     """Get events using permanent token authentication"""
-    # Use the helper function instead of direct token validation
-    user_id = await get_user_from_token(token, db)
+    token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
+    print(token_record)
+    if not token_record:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
     
     now = datetime.now()
     today_start = datetime.combine(now.date(), time.min)
     today_end = datetime.combine(now.date(), time.max)
     
-    query = db.query(EventModel).filter(EventModel.user_id == user_id)
+    query = db.query(EventModel).filter(EventModel.user_id == token_record.user_id)
     
     # Add status filter
     if status:
