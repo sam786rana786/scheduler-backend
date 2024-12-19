@@ -306,18 +306,14 @@ async def get_events_external(
     db: Session = Depends(get_db)
 ):
     """Get events using permanent token authentication"""
-    token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
-    if not token_record:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
+    # Use the helper function instead of direct token validation
+    user_id = await get_user_from_token(token, db)
     
     now = datetime.now()
     today_start = datetime.combine(now.date(), time.min)
     today_end = datetime.combine(now.date(), time.max)
     
-    query = db.query(EventModel).filter(EventModel.user_id == token_record.user_id)
+    query = db.query(EventModel).filter(EventModel.user_id == user_id)
     
     # Add status filter
     if status:
