@@ -400,7 +400,7 @@ async def delete_event_external(
 
         # Get user's timezone
         user_settings = db.query(Settings).filter(Settings.user_id == token_record.user_id).first()
-        user_profile = db.query(ProfileModel).filter(ProfileModel.user_id == token_record.user_id).first()
+        user_profile = db.query(Profile).filter(Profile.user_id == token_record.user_id).first()
         try:
             # Send notifications (email and optional SMS)
             notification_results = await send_notifications(
