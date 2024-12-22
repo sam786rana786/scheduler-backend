@@ -368,5 +368,63 @@ async def get_events_external(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+@external_router.delete("/external/{event_id}")
+async def delete_event_external(
+    event_id: int,
+    token: str = Query(..., description="API Token"),
+    reason: str = Body(..., description="Cancellation reason"),
+    db: Session = Depends(get_db)
+):
+    """Delete event using token authentication"""
+    try:
+        # Verify token and get user
+        token_record = db.query(TokenModel).filter(TokenModel.token == token).first()
+        if not token_record:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+
+        # Get event and verify ownership
+        event = db.query(EventModel).filter(
+            EventModel.id == event_id,
+            EventModel.user_id == token_record.user_id
+        ).first()
+
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Event not found or unauthorized"
+            )
+
+        # Get user's timezone
+        user_settings = db.query(Settings).filter(Settings.user_id == token_record.user_id).first()
+        user_profile = db.query(ProfileModel).filter(ProfileModel.user_id == token_record.user_id).first()
+        try:
+        # Send notifications (email and optional SMS)
+        notification_results = await send_notifications(
+            event=event,
+            user_settings=user_settings,
+            reason=reason,
+            profile=user_profile,
+            attendee_email=event.attendee_email,
+            attendee_phone=event.attendee_phone,
+        )
+        notification = {
+            "message": "Event cancelled, deleted, and notifications sent",
+            "notifications": notification_results
+        }
+        
+        db.delete(event)
+        db.commit()
+        return notification
+        # Delete the event
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to cancel event: {str(e)}"
+        )
         
 router.include_router(external_router)
