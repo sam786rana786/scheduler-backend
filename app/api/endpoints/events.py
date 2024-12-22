@@ -420,6 +420,14 @@ async def delete_event_external(
             db.commit()
             return notification
             # Delete the event
+        except Exception as notify_error:
+            # Log the notification error but return success for event deletion
+            print(f"Failed to send notifications: {str(notify_error)}")
+            return {
+                "message": "Event cancelled and deleted successfully",
+                "notifications": {"email_sent": False, "sms_sent": False}
+            }
+            
     except Exception as e:
         db.rollback()
         raise HTTPException(
