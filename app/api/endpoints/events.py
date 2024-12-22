@@ -402,24 +402,24 @@ async def delete_event_external(
         user_settings = db.query(Settings).filter(Settings.user_id == token_record.user_id).first()
         user_profile = db.query(ProfileModel).filter(ProfileModel.user_id == token_record.user_id).first()
         try:
-        # Send notifications (email and optional SMS)
-        notification_results = await send_notifications(
-            event=event,
-            user_settings=user_settings,
-            reason=reason,
-            profile=user_profile,
-            attendee_email=event.attendee_email,
-            attendee_phone=event.attendee_phone,
-        )
-        notification = {
-            "message": "Event cancelled, deleted, and notifications sent",
-            "notifications": notification_results
-        }
-        
-        db.delete(event)
-        db.commit()
-        return notification
-        # Delete the event
+            # Send notifications (email and optional SMS)
+            notification_results = await send_notifications(
+                event=event,
+                user_settings=user_settings,
+                reason=reason,
+                profile=user_profile,
+                attendee_email=event.attendee_email,
+                attendee_phone=event.attendee_phone,
+            )
+            notification = {
+                "message": "Event cancelled, deleted, and notifications sent",
+                "notifications": notification_results
+            }
+            
+            db.delete(event)
+            db.commit()
+            return notification
+            # Delete the event
     except Exception as e:
         db.rollback()
         raise HTTPException(
